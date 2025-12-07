@@ -1,6 +1,7 @@
 package com.ecommerce.ecommerce.service;
 
 import com.ecommerce.ecommerce.exceptions.APIException;
+import com.ecommerce.ecommerce.exceptions.ResourceNotFoundException;
 import com.ecommerce.ecommerce.model.Cart;
 import com.ecommerce.ecommerce.model.Category;
 import com.ecommerce.ecommerce.model.Product;
@@ -47,6 +48,9 @@ public class ProductServiceImpl implements ProductService {
     @Value("${project.image}")
     private String path;
 
+    @Value("${image.base.url}")
+    private String imageBaseUrl;
+
     @Override
     public ProductDTO addProduct(Long categoryId, ProductDTO productDTO) {
         Category category = categoryRepository.findById(categoryId)
@@ -78,7 +82,11 @@ public class ProductServiceImpl implements ProductService {
             throw new APIException("No products available currently.");
         }
         List<ProductDTO> productDTOs = products.stream()
-                .map(product -> modelMapper.map(product, ProductDTO.class))
+                .map(product -> {
+                    ProductDTO productDTO = modelMapper.map(product, ProductDTO.class);
+                    productDTO.setImage(constructImageUrl(product.getImage()));
+                    return productDTO;
+                })
                 .toList();
         ProductResponse productResponse = new ProductResponse();
         productResponse.setProducts(productDTOs);
@@ -89,6 +97,10 @@ public class ProductServiceImpl implements ProductService {
         productResponse.setLastPage(pageProducts.isLast());
 
         return productResponse;
+    }
+
+    private String constructImageUrl(String imageName) {
+        return imageBaseUrl.endsWith("/") ? imageBaseUrl + imageName : imageBaseUrl + "/" + imageName;
     }
 
     @Override
@@ -189,7 +201,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductDTO updateProductImage(Long productId, MultipartFile image) throws IOException {
         Product existingProduct = productRepository.findById(productId)
-                .orElseThrow(() -> new APIException("Product with id " + productId + " not found !!!"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "productId", productId));
 //        String path = "images/";
         String imageName = fileService.uploadImage(path, image);
         existingProduct.setImage(imageName);
